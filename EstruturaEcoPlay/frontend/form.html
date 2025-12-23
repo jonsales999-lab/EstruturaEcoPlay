@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <title>Cadastro de Usuário - EcoPlay</title>
+</head>
+<body>
+  <h1>Cadastro de Usuário</h1>
+  <form id="cadastroForm">
+    <label>Nome completo: <input name="nome_completo" type="text" required></label><br>
+
+    <label>Sexo:
+      <select name="sexo" required>
+        <option value="">-- selecione --</option>
+        <option value="M">M</option>
+        <option value="F">F</option>
+      </select>
+    </label><br>
+
+    <label>Data de nascimento: <input name="data_nascimento" type="date" required></label><br>
+
+    <label>Função:
+      <select name="funcao" required>
+        <option value="">-- selecione --</option>
+        <option value="Atuante">Atuante</option>
+        <option value="Líder">Líder</option>
+        <option value="Vice">Vice</option>
+        <option value="Fiscal">Fiscal</option>
+        <option value="Suplente">Suplente</option>
+      </select>
+    </label><br>
+
+    <label>Telefone pessoal: <input name="telefone_pessoal" type="tel" required></label><br>
+
+    <label>RG (arquivo): <input name="rg_path_file" type="file" accept="image/*,.pdf"></label><br>
+    <label>CPF (arquivo): <input name="cpf_path_file" type="file" accept="image/*,.pdf"></label><br>
+
+    <label>Email: <input name="email" type="email" required></label><br>
+    <label>Senha: <input name="senha" type="password" required></label><br>
+
+    <label>Cursando:
+      <select name="cursando">
+        <option value="">-- selecione --</option>
+        <option value="Fundamental 1">Fundamental 1</option>
+        <option value="Fundamental 2">Fundamental 2</option>
+        <option value="Universitário">Universitário</option>
+      </select>
+    </label><br>
+
+    <label>Manequim:
+      <select name="manequim">
+        <option value="">-- selecione --</option>
+        <option>PP</option><option>P</option><option>M</option><option>G</option><option>GG</option>
+      </select>
+    </label><br>
+
+    <label>Tipo sanguíneo:
+      <select name="tipo_sanguineo">
+        <option value="">-- selecione --</option>
+        <option>A+</option><option>A-</option><option>B+</option><option>B-</option>
+        <option>AB+</option><option>AB-</option><option>O+</option><option>O-</option>
+      </select>
+    </label><br>
+
+    <label>
+      Medicamento controlado: <input name="medicamento_controlado" type="checkbox">
+    </label><br>
+
+    <label>Nome do medicamento (1): <input name="nome_medicamento_1" type="text"></label><br>
+
+    <label>
+      Declaração lida: <input name="declaracao_lida" type="checkbox">
+    </label><br>
+
+    <button type="submit">Registrar</button>
+  </form>
+
+  <pre id="output" style="white-space:pre-wrap; background:#f9f9f9; padding:8px; margin-top:16px;"></pre>
+
+  <script>
+    function log(msg) {
+      const out = document.getElementById('output');
+      out.textContent = msg + "\n\n" + out.textContent;
+    }
+
+    function fileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        if (!file || !(file instanceof File)) return resolve(null);
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    document.getElementById('cadastroForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+
+      const rgFile = f.get('rg_path_file');
+      const cpfFile = f.get('cpf_path_file');
+
+      // Correção na verificação de arquivos vazios
+      const rgBase64 = (rgFile && rgFile.name) ? await fileToBase64(rgFile) : null;
+      const cpfBase64 = (cpfFile && cpfFile.name) ? await fileToBase64(cpfFile) : null;
+
+      const payload = {
+        nome_completo: f.get('nome_completo') || null,
+        sexo: f.get('sexo') || null,
+        data_nascimento: f.get('data_nascimento') || null,
+        funcao: f.get('funcao') || null,
+        telefone_pessoal: f.get('telefone_pessoal') || null,
+        rg_path: rgBase64,
+        cpf_path: cpfBase64,
+        email: f.get('email') || null,
+        senha: f.get('senha') || null,
+        cursando: f.get('cursando') || null,
+        manequim: f.get('manequim') || null,
+        tipo_sanguineo: f.get('tipo_sanguineo') || null,
+        medicamento_controlado: f.get('medicamento_controlado') === 'on',
+        nome_medicamento_1: f.get('nome_medicamento_1') || null,
+        declaracao_lida: f.get('declaracao_lida') === 'on'
+      };
+
+      log('Enviando cadastro para o backend...');
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      if (submitBtn) submitBtn.disabled = true;
+
+      try {
+        const res = await fetch('http://127.0.0.1:8000/auth/', {
+          method: 'POST',
+          mode: 'cors', // Garante o modo CORS explicitamente
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        const text = await res.text();
+        let data = null;
+        try { data = JSON.parse(text); } catch(e) { data = null; }
+
+        if (res.ok) {
+          log('Sucesso: ' + (data ? JSON.stringify(data, null, 2) : text));
+        } else {
+          // Se cair aqui, o servidor respondeu (ex: erro 400 ou 500)
+          log(`Erro ${res.status}: ` + (data?.detail ? JSON.stringify(data.detail, null, 2) : text));
+        }
+      } catch (err) {
+        // Se cair aqui, é erro de rede ou CORS (o servidor nem respondeu direito)
+        log('Falha na requisição (CORS ou Servidor Offline): ' + err.message);
+        console.error('Erro detalhado:', err);
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
